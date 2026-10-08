@@ -1,0 +1,6 @@
+# Local submission reports and operating-system files
+Exam_Report_*.txt
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
