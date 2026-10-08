@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#111827">
+<title>Secure Mobile Examination</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+header{position:sticky;top:0;z-index:20;background:#111827;color:#fff;padding:12px 14px;box-shadow:0 2px 8px #0003}
+.top{display:flex;justify-content:space-between;gap:10px;align-items:center}.title{font-weight:700;font-size:16px}
+#timer{font-weight:800;background:#fff;color:#111827;padding:7px 10px;border-radius:8px}
+#monitor{font-size:12px;margin-top:7px}.ok{color:#86efac}.bad{color:#fca5a5}
+main{max-width:700px;margin:auto;padding:14px}.card{background:#fff;border-radius:14px;padding:18px;margin:12px 0;box-shadow:0 2px 12px #00000012}
+input{width:100%;padding:13px;border:1px solid #d1d5db;border-radius:9px;font-size:16px;margin:7px 0 12px}
+button{border:0;border-radius:10px;padding:13px 16px;font-weight:700;font-size:15px;background:#2563eb;color:#fff}
+button:disabled{opacity:.5}.danger{background:#dc2626}.secondary{background:#374151}
+.q{font-weight:700;line-height:1.45}.opt{display:block;border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin:9px 0;background:#fafafa}
+.opt input{width:auto;margin:0 8px 0 0}.warn{background:#fff7ed;border-left:4px solid #f97316;padding:10px;border-radius:8px}
+.hidden{display:none}.result{font-size:18px;font-weight:700}.small{font-size:12px;color:#6b7280}
+#violationBox{position:fixed;inset:0;background:#000b;z-index:100;display:none;align-items:center;justify-content:center;padding:20px}
+#violationBox .modal{background:#fff;border-radius:16px;padding:22px;max-width:420px;text-align:center}
+</style>
+</head>
+<body oncontextmenu="return false">
+<header>
+  <div class="top"><div class="title">🔒 Secure Mobile Examination</div><div id="timer">30:00</div></div>
+  <div id="monitor" class="ok">● Monitoring ACTIVE | Violations: 0</div>
+</header>
+
+<main>
+<section id="start" class="card">
+  <h2>Student Examination</h2>
+  <div class="warn"><p><b>Question pattern:</b> 10 Very Easy + 10 Easy + 5 Moderate + 5 Tough = 30 questions.</p>Do not switch tabs/apps, leave this page, copy/paste, open menus, or use another window during the examination. Every detected violation is recorded and an email alert is sent to the teacher.</div>
+  <label>Student Name</label><input id="student" autocomplete="name">
+  <label>Roll Number</label><input id="roll">
+  <button id="startBtn" onclick="startExam()">Start Secure Exam</button>
+  <p class="small">After submission, a report is automatically generated and downloaded. <br><br>Mobile browsers cannot reliably detect a second phone, screenshots, or what is displayed by another app. Leaving the exam page is treated as a violation.</p>
+</section>
+
+<section id="exam" class="hidden">
+  <div id="questions"></div>
+  <button class="danger" onclick="submitExam()">Submit Examination</button>
+</section>
+
+<section id="result" class="card hidden"></section>
+</main>
+
+<div id="violationBox">
+  <div class="modal">
+    <h2>⚠️ Violation Detected</h2>
+    <p id="violationText"></p>
+    <button onclick="closeViolation()">Return to Exam</button>
+  </div>
+</div>
+
+<script>
+/* IMPORTANT:
+   Paste your deployed Google Apps Script Web App URL here. */
+const BANK = [
+/* ==================== 10 VERY EASY ==================== */
+["What is the main purpose of an ignition system in an SI engine?",["To produce a spark at the correct time","To cool the engine","To lubricate the engine","To pump coolant"],0],
+["Which ignition system uses a battery as its electrical source?",["Battery ignition system","Magneto ignition system","Hydraulic ignition system","Air ignition system"],0],
+["What is the function of a distributor in an ignition system?",["To send high voltage to the correct spark plug","To pump fuel","To cool the cylinder","To measure brake power"],0],
+["The octane number is mainly associated with:",["Petrol","Diesel","Coolant","Lubricating oil"],0],
+["The cetane number is mainly associated with:",["Diesel","Petrol","Coolant","Engine oil"],0],
+["The first stage of combustion in a CI engine is called:",["Ignition delay","Rapid combustion","After-burning","Expansion"],0],
+["What is the main purpose of the cooling system?",["To maintain a suitable engine operating temperature","To increase fuel consumption","To stop lubrication","To increase exhaust pressure"],0],
+["Brake power is the power available at the:",["Crankshaft","Fuel injector","Radiator","Spark plug"],0],
+["Which instrument is commonly used to measure brake power?",["Dynamometer","Thermometer","Barometer","Manometer"],0],
+["What does CRDI stand for?",["Common Rail Direct Injection","Controlled Rotary Diesel Ignition","Common Radiator Direct Injection","Compressed Rail Diesel Intake"],0],
+
+/* ==================== 10 EASY ==================== */
+["What happens when the contact breaker opens in a battery ignition system?",["The magnetic field collapses","The fuel pump stops permanently","The coolant starts boiling","The exhaust valve closes"],0],
+["A magneto produces electrical voltage mainly by:",["Electromagnetic induction","Hydraulic pressure","Fuel combustion","Heat conduction"],0],
+["Ignition advance means that the spark occurs:",["Before TDC during the compression stroke","After BDC during exhaust","At the end of the exhaust stroke","Only during the intake stroke"],0],
+["A higher octane number indicates:",["Greater resistance to knocking","Greater tendency to knock","Higher cetane number","Higher cooling capacity"],0],
+["In an air-injection fuel system, compressed air is used to:",["Carry fuel into the cylinder","Cool the fuel pump","Lubricate the piston","Operate the radiator"],0],
+["In an airless injection system, fuel is supplied by:",["A fuel pump","A radiator","A thermostat","A dynamometer"],0],
+["A higher cetane number generally indicates:",["Shorter ignition delay","Longer ignition delay","Higher octane number","Lower fuel injection pressure"],0],
+["Fins are provided on an air-cooled engine mainly to:",["Increase heat-transfer area","Decrease cylinder volume","Store lubricating oil","Increase fuel pressure"],0],
+["In a dry-sump lubrication system, lubricating oil is stored in:",["A separate oil tank","The fuel tank","The radiator","The combustion chamber"],0],
+["The relationship between indicated power, brake power and friction power is:",["IP = BP + FP","IP = BP − FP","IP = BP/FP","IP = FP − BP"],0],
+
+/* ==================== 5 MODERATE ==================== */
+["Why does excessive ignition advance tend to increase knocking in an SI engine?",["It causes combustion to occur too early and increases pressure/temperature before the ideal point","It completely stops flame propagation","It reduces the compression ratio to zero","It prevents the spark from occurring"],0],
+["Diesel knock is mainly associated with:",["Rapid burning of fuel accumulated during the ignition-delay period","Very slow cooling of the radiator","Low lubricating-oil level only","Failure of the exhaust system"],0],
+["Mechanical efficiency of an IC engine is defined as:",["BP/IP","IP/BP","FP/BP","BP/FP"],0],
+["If an engine has an indicated power of 40 kW and friction power of 8 kW, its brake power is:",["32 kW","48 kW","5 kW","40 kW"],0],
+["If brake power is 30 kW and indicated power is 40 kW, the mechanical efficiency is:",["75%","25%","70%","133.3%"],0],
+
+/* ==================== 5 TOUGH ==================== */
+["An engine develops 50 kW indicated power and has a mechanical efficiency of 80%. What is its brake power?",["40 kW","62.5 kW","10 kW","80 kW"],0],
+["An engine produces 30 kW brake power while consuming fuel at a rate of 6 kg/h. What is its BSFC?",["0.20 kg/kWh","0.50 kg/kWh","5.00 kg/kWh","180 kg/kWh"],0],
+["An engine has an indicated thermal efficiency of 40% and mechanical efficiency of 75%. Its brake thermal efficiency is:",["30%","53.3%","40%","15%"],0],
+["Which sequence correctly represents the major stages of SI-engine combustion described in the study material?",["Ignition lag → flame propagation/rapid pressure rise → after-burning","After-burning → ignition lag → flame propagation","Flame propagation → ignition lag → exhaust","Exhaust → ignition lag → flame propagation"],0],
+["An engine's fuel-energy input is distributed among brake power, cooling loss, exhaust loss and other losses. Which statement correctly represents the heat-balance principle?",["Fuel energy input = useful brake power + cooling/exhaust/other losses","Fuel energy input = brake power − all losses","Brake power = fuel energy input + all losses","Cooling loss alone must equal fuel energy input"],0]
+];
+
+let questions=[], answers={}, idx=0, violations=0, started=false, submitted=false;
+let attemptId = "ATT-" + Date.now() + "-" + Math.random().toString(36).slice(2,7);
+let lastViolationAt=0, exitSent=false, timerSeconds=1800, timerHandle=null;
+
+function esc(s){return s.replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));}
+function studentInfo(){return {student:document.getElementById("student").value.trim(),roll:document.getElementById("roll").value.trim(),attemptId};}
+
+
+function buildReport(autoSubmitted=false){
+  let score=0, attempted=0;
+  questions.forEach((q,i)=>{
+    if(answers[i]!==undefined){
+      attempted++;
+      if(answers[i]===q.correct) score++;
+    }
+  });
+
+  const now = new Date();
+  const report = {
+    examination: "Secure Mobile Examination",
+    student: document.getElementById("student").value.trim(),
+    rollNumber: document.getElementById("roll").value.trim(),
+    attemptId: attemptId,
+    submittedAt: now.toLocaleString(),
+    submittedAtISO: now.toISOString(),
+    score: score,
+    totalQuestions: questions.length,
+    attemptedQuestions: attempted,
+    unansweredQuestions: questions.length-attempted,
+    violations: violations,
+    autoSubmitted: autoSubmitted,
+    violationPolicy: "Any recorded browser/page visibility, focus, copy/cut/paste, context-menu, restricted shortcut, fullscreen-exit or page-exit event is listed as a violation.",
+    browser: navigator.userAgent,
+    events: JSON.parse(localStorage.getItem("examEvents") || "[]")
+  };
+
+  return report;
+}
+
+function recordEvent(event, details=""){
+  const arr = JSON.parse(localStorage.getItem("examEvents") || "[]");
+  arr.push({
+    event:event,
+    details:details,
+    time:new Date().toISOString(),
+    violationNumber:violations
+  });
+  localStorage.setItem("examEvents", JSON.stringify(arr));
+}
+
+function downloadReport(report){
+  const eventsText = report.events.length
+    ? report.events.map((e,i) =>
+        (i+1) + ". Date/Time       : " + e.time + "\n" +
+        "   Event            : " + e.event + "\n" +
+        "   Details          : " + (e.details || "None") + "\n" +
+        "   Violation Number : " + e.violationNumber + "\n"
+      ).join("\n")
+    : "No violations or monitoring events were recorded.";
+
+  const text =
+"============================================================\n" +
+"              SECURE EXAMINATION REPORT\n" +
+"============================================================\n\n" +
+"EXAMINATION\n-----------\n" +
+"Examination        : " + report.examination + "\n" +
+"Attempt ID         : " + report.attemptId + "\n" +
+"Submission Date    : " + report.submittedAt + "\n" +
+"Auto Submitted     : " + (report.autoSubmitted ? "YES" : "NO") + "\n\n" +
+
+"STUDENT INFORMATION\n-------------------\n" +
+"Student Name       : " + report.student + "\n" +
+"Roll Number        : " + report.rollNumber + "\n\n" +
+
+"EXAMINATION RESULT\n------------------\n" +
+"Score              : " + report.score + "/" + report.totalQuestions + "\n" +
+"Attempted          : " + report.attemptedQuestions + "\n" +
+"Unanswered         : " + report.unansweredQuestions + "\n" +
+"Total Questions    : " + report.totalQuestions + "\n\n" +
+
+"ANTI-CHEATING REPORT\n--------------------\n" +
+"Recorded Violations: " + report.violations + "\n\n" +
+
+"EVENT / VIOLATION LOG\n---------------------\n" +
+eventsText + "\n\n" +
+
+"MONITORING INFORMATION\n----------------------\n" +
+"- Exam page/app becoming hidden\n" +
+"- Browser window losing focus\n" +
+"- Copy/cut/paste attempts\n" +
+"- Context-menu attempts\n" +
+"- Restricted keyboard shortcuts\n" +
+"- Developer-tools shortcuts\n" +
+"- Fullscreen exit\n" +
+"- Exam page exit/unload attempts\n" +
+"- Exam start/submission\n\n" +
+
+"BROWSER INFORMATION\n--------------------\n" +
+report.browser + "\n\n" +
+
+"IMPORTANT\n---------\n" +
+"A normal webpage cannot reliably detect activity performed on another\n" +
+"physical device, every screenshot, or every action inside another\n" +
+"mobile application.\n\n" +
+
+"============================================================\n" +
+"                    END OF REPORT\n" +
+"============================================================\n";
+
+  const blob = new Blob([text], {type:"application/octet-stream"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+
+  const safeRoll = (report.rollNumber || "student")
+    .replace(/[^a-z0-9_-]/gi,"_");
+
+  // No extension is intentionally used.
+  a.href = url;
+  a.download = "Exam_Report_" + safeRoll + "_" + report.attemptId;
+
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  setTimeout(function(){
+    URL.revokeObjectURL(url);
+  }, 5000);
+}
+
+function downloadCurrentReport(){
+  const saved = localStorage.getItem("examReport");
+  if(saved){
+    downloadReport(JSON.parse(saved));
+  }
+}
+
+
+function finishReport(autoSubmitted=false){
+  const report = buildReport(autoSubmitted);
+  localStorage.setItem("examReport", JSON.stringify(report));
+  downloadReport(report);
+
+  const r=document.getElementById("result");
+  r.classList.remove("hidden");
+  r.innerHTML=`
+    <h2>Examination Submitted</h2>
+    <p class="result">${esc(report.student)}</p>
+    <p>Score: <b>${report.score}/${report.totalQuestions}</b></p>
+    <p>Attempted: ${report.attemptedQuestions}</p>
+    <p>Recorded violations: <b>${report.violations}</b></p>
+    <p class="small">Your complete examination report has been downloaded automatically as a file without a file extension.</p>
+    <button onclick="downloadCurrentReport()">📄 Download Report Again</button>
+    <p class="small">The downloaded report contains the student's details, result, submission information, violation count, complete event log and browser information. The filename is created without a file extension.</p>
+  `;
+}
+
+function monitorText(){
+  document.getElementById("monitor").textContent="● Monitoring ACTIVE | Violations: "+violations;
+  document.getElementById("monitor").className=violations?"bad":"ok";
+}
+function violation(reason){
+  if(!started || submitted) return;
+  const now=Date.now();
+  if(now-lastViolationAt<1500) return;
+  lastViolationAt=now;
+  violations++; monitorText();
+  recordEvent(reason);
+  if(violations===1){
+    document.getElementById("violationText").textContent="Violation #1: "+reason+". This incident has been recorded and the teacher has been notified.";
+    document.getElementById("violationBox").style.display="flex";
+  }
+}
+function closeViolation(){document.getElementById("violationBox").style.display="none";}
+
+function shuffle(a){for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function buildQuestions(){
+  questions=shuffle([...BANK]).map(x=>({q:x[0],o:shuffle(x[1].map((v,i)=>({v,i}))).map(z=>z.v),correct:x[1].findIndex(v=>v===x[1][x[2]])}));
+  /* recompute correct index after option shuffle */
+  questions.forEach(x=>{let original=BANK.find(b=>b[0]===x.q);let correctText=original[1][original[2]];x.correct=x.o.indexOf(correctText);});
+  document.getElementById("questions").innerHTML=questions.map((x,i)=>`
+  <div class="card"><div class="q">${i+1}. ${esc(x.q)}</div>
+  ${x.o.map((o,j)=>`<label class="opt"><input type="radio" name="q${i}" value="${j}" onchange="answers[${i}]=${j}"> ${esc(o)}</label>`).join("")}</div>`).join("");
+}
+
+function startExam(){
+  const s=studentInfo();
+  if(!s.student||!s.roll){alert("Enter student name and roll number.");return;}
+  started=true; violations=0; monitorText(); buildQuestions();
+  document.getElementById("start").classList.add("hidden");
+  document.getElementById("exam").classList.remove("hidden");
+  installMonitoring(); startTimer(); recordEvent("EXAM_STARTED");
+  try{document.documentElement.requestFullscreen?.();}catch(e){}
+}
+
+function startTimer(){
+  timerHandle=setInterval(()=>{
+    timerSeconds--; let m=Math.floor(timerSeconds/60), sec=timerSeconds%60;
+    document.getElementById("timer").textContent=`${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;
+    if(timerSeconds<=0){clearInterval(timerHandle); submitExam(true);}
+  },1000);
+}
+function installMonitoring(){
+  document.addEventListener("visibilitychange",()=>{ if(document.hidden) violation("Exam page hidden / app or tab switched"); else recordEvent("RETURNED_TO_EXAM");});
+  window.addEventListener("blur",()=>violation("Exam window lost focus"));
+  document.addEventListener("copy",e=>{e.preventDefault();violation("Copy attempted");});
+  document.addEventListener("cut",e=>{e.preventDefault();violation("Cut attempted");});
+  document.addEventListener("paste",e=>{e.preventDefault();violation("Paste attempted");});
+  document.addEventListener("contextmenu",e=>{e.preventDefault();violation("Context menu attempted");});
+  document.addEventListener("keydown",e=>{
+    const k=e.key.toLowerCase();
+    if((e.ctrlKey||e.metaKey)&&["c","x","v","u","s","p","a","l"].includes(k)){e.preventDefault();violation("Restricted keyboard shortcut: "+k);}
+    if(e.key==="F12" || ((e.ctrlKey||e.metaKey)&&e.shiftKey&&["i","j","c"].includes(k))){e.preventDefault();violation("Developer tools shortcut attempted");}
+  });
+  document.addEventListener("fullscreenchange",()=>{if(started&&!document.fullscreenElement) violation("Fullscreen mode exited");});
+  window.addEventListener("pagehide",()=>{if(started&&!submitted&&!exitSent){exitSent=true;recordEvent("EXAM_PAGE_EXITED");}});
+  window.addEventListener("beforeunload",()=>{if(started&&!submitted&&!exitSent){exitSent=true;recordEvent("EXAM_PAGE_UNLOADED");}});
+}
+
+function submitExam(auto=false){
+  if(submitted)return;
+  if(!auto && !confirm("Submit your examination?"))return;
+  submitted=true; clearInterval(timerHandle);
+  let score=0, attempted=0;
+  questions.forEach((q,i)=>{if(answers[i]!==undefined){attempted++;if(answers[i]===q.correct)score++;}});
+  document.getElementById("exam").classList.add("hidden");
+  finishReport(auto);
+  try{document.exitFullscreen?.();}catch(e){}
+}
+</script>
+</body>
+</html>
